@@ -1,11 +1,11 @@
 @st.cache_data
 def load_and_merge_data():
     current_dir = os.path.dirname(os.path.abspath(__file__))
-    
-    file_loc_path = os.path.join(current_dir, '´ë±¸µµ½Ã°³¹ß°ø»ç_»ç¾÷¼ÒÀçÁöÁ¤º¸_20230821.csv')
-    file_code_path = os.path.join(current_dir, '´ë±¸µµ½Ã°³¹ß°ø»ç_µµ½Ã°³¹ß»ç¾÷ÄÚµåÁ¤º¸_20230821.csv')
-    
-    # errors='ignore' ¶Ç´Â encoding_errors='ignore' ¿É¼ÇÀ» Ãß°¡ÇÏ¿© ºÒ·® ¹ÙÀÌÆ®¸¦ °­Á¦ ÆĞ½ºÇÕ´Ï´Ù.
+
+    file_loc_path = os.path.join(current_dir, 'ëŒ€êµ¬ë„ì‹œê°œë°œê³µì‚¬_ì‚¬ì—…ì†Œì¬ì§€ì •ë³´_20230821.csv')
+    file_code_path = os.path.join(current_dir, 'ëŒ€êµ¬ë„ì‹œê°œë°œê³µì‚¬_ë„ì‹œê°œë°œì‚¬ì—…ì½”ë“œì •ë³´_20230821.csv')
+
+    # errors='ignore' ë˜ëŠ” encoding_errors='ignore' ì˜µì…˜ì„ ì¶”ê°€í•˜ì—¬ ë¶ˆëŸ‰ ë°”ì´íŠ¸ë¥¼ ê°•ì œ íŒ¨ìŠ¤í•©ë‹ˆë‹¤.
     try:
         df_loc = pd.read_csv(file_loc_path, encoding='cp949', errors='ignore')
         df_code = pd.read_csv(file_code_path, encoding='cp949', errors='ignore')
@@ -14,40 +14,41 @@ def load_and_merge_data():
             df_loc = pd.read_csv(file_loc_path, encoding='utf-8', errors='ignore')
             df_code = pd.read_csv(file_code_path, encoding='utf-8', errors='ignore')
         except FileNotFoundError as e:
-            st.error(f"?? ¿øº» CSV ÆÄÀÏÀÌ ÇÁ·ÎÁ§Æ® Æú´õ¿¡ ¾ø½À´Ï´Ù: {e.filename}")
+            st.error(f"ì›ë³¸ CSV íŒŒì¼ì´ í”„ë¡œì íŠ¸ í´ë”ì— ì—†ìŠµë‹ˆë‹¤: {e.filename}")
             st.stop()
         except Exception as e:
-            # ÃÖÁ¾ ¿¹¿Ü »óÈ²¿¡¼­´Â À¯Àú°¡ ÀÎ½ÄÇÒ ¼ö ÀÖ°Ô ¿¡·¯ ¹®±¸ Ãâ·Â
-            st.error(f"µ¥ÀÌÅÍ¸¦ ÀĞ´Â Áß ¿¹ÃøÇÏÁö ¸øÇÑ ÀÎÄÚµù ¿À·ù°¡ ¹ß»ıÇß½À´Ï´Ù: {e}")
+            # ìµœì¢… ì˜ˆì™¸ ìƒí™©ì—ì„œëŠ” ìœ ì €ê°€ ì¸ì‹í•  ìˆ˜ ìˆê²Œ ì—ëŸ¬ ë¬¸êµ¬ ì¶œë ¥
+            st.error(f"ë°ì´í„°ë¥¼ ì½ëŠ” ì¤‘ ì˜ˆì¸¡í•˜ì§€ ëª»í•œ ì¸ì½”ë”© ì˜¤ë¥˜ê°€ ë°œìƒí–ˆìŠµë‹ˆë‹¤: {e}")
             st.stop()
 
-    # (ÀÌÇÏ µ¥ÀÌÅÍ À¶ÇÕ ·ÎÁ÷Àº µ¿ÀÏ...)
+    # (ì´í•˜ ë°ì´í„° ìœµí•© ë¡œì§ì€ ë™ì¼...)
     enriched_data = []
     for idx, row in df_loc.iterrows():
-        lp = row['»ç¾÷Áö¿ª']
-        c_name, c_type, s_type = "±âÅ¸ °³¹ß»ç¾÷", "±âÅ¸", "±âÅ¸"
-        lp_clean = re.sub(r'[^°¡-ÆR0-9a-zA-Z]', '', str(lp))
+        lp = row['ì‚¬ì—…ì§€ì—­']
+        c_name, c_type, s_type = "ê¸°íƒ€ ê°œë°œì‚¬ì—…", "ê¸°íƒ€", "ê¸°íƒ€"
+        lp_clean = re.sub(r'[^ê°€-í£0-9a-zA-Z]', '', str(lp))
         for _, c_row in df_code.iterrows():
-            c_name_clean = re.sub(r'[^°¡-ÆR0-9a-zA-Z]', '', str(c_row['»ç¾÷¸í']))
-            c_dist_clean = re.sub(r'[^°¡-ÆR0-9a-zA-Z]', '', str(c_row['»ç¾÷Áö±¸']))
-            if (c_name_clean in lp_clean) or (lp_clean in c_name_clean) or (c_dist_clean in lp_clean) or (lp_clean in c_dist_clean):
-                c_name = c_row['»ç¾÷¸í']
-                c_type = c_row['»ç¾÷À¯Çü']
-                s_type = c_row['°ø±ŞÀ¯Çü']
+            c_name_clean = re.sub(r'[^ê°€-í£0-9a-zA-Z]', '', str(c_row['ì‚¬ì—…ëª…']))
+            c_dist_clean = re.sub(r'[^ê°€-í£0-9a-zA-Z]', '', str(c_row['ì‚¬ì—…ì§€êµ¬']))
+            if (c_name_clean in lp_clean) or (lp_clean in c_name_clean) or (c_dist_clean in lp_clean) or (
+                    lp_clean in c_dist_clean):
+                c_name = c_row['ì‚¬ì—…ëª…']
+                c_type = c_row['ì‚¬ì—…ìœ í˜•']
+                s_type = c_row['ê³µê¸‰ìœ í˜•']
                 break
-                
-        full_dong = row['¹ıÁ¤µ¿']
+
+        full_dong = row['ë²•ì •ë™']
         parts = str(full_dong).split()
-        gu = parts[1] if len(parts) > 1 else "±âÅ¸"
-        dong = " ".join(parts[2:]) if len(parts) > 2 else "±âÅ¸"
-        
+        gu = parts[1] if len(parts) > 1 else "ê¸°íƒ€"
+        dong = " ".join(parts[2:]) if len(parts) > 2 else "ê¸°íƒ€"
+
         enriched_data.append({
-            '»ç¾÷Áö¿ª': lp,
-            '±¸': gu,
-            'µ¿': dong,
-            '»ç¾÷¸í_¿¬°è': c_name,
-            '»ç¾÷À¯Çü': c_type,
-            '°ø±ŞÀ¯Çü': s_type
+            'ì‚¬ì—…ì§€ì—­': lp,
+            'êµ¬': gu,
+            'ë™': dong,
+            'ì‚¬ì—…ëª…_ì—°ê³„': c_name,
+            'ì‚¬ì—…ìœ í˜•': c_type,
+            'ê³µê¸‰ìœ í˜•': s_type
         })
-        
+
     return pd.DataFrame(enriched_data)
