@@ -3,11 +3,11 @@ import pandas as pd
 import os
 import re
 
-# 1. 페이지 설정
+# 1. 페이지 설정 (최상단에 위치해야 합니다)
 st.set_page_config(page_title="대구 동네 정착 시뮬레이터", layout="wide", initial_sidebar_state="expanded")
 
 
-# 2. 데이터 로드 및 자동 융합 함수 (인코딩 에러 방어 및 불량 바이트 패스 적용)
+# 2. 데이터 로드 및 자동 융합 함수 (판다스 버전별 인코딩 에러 완벽 방어)
 @st.cache_data
 def load_and_merge_data():
     current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -15,21 +15,33 @@ def load_and_merge_data():
     file_loc_path = os.path.join(current_dir, '대구도시개발공사_사업소재지정보_20230821.csv')
     file_code_path = os.path.join(current_dir, '대구도시개발공사_도시개발사업코드정보_20230821.csv')
 
+    # [3중 방어 오토 인코딩 파일 로더]
     try:
-        df_loc = pd.read_csv(file_loc_path, encoding='cp949', errors='ignore')
-        df_code = pd.read_csv(file_code_path, encoding='cp949', errors='ignore')
-    except Exception:
+        # 1안: 최신 판다스 표준 규격 (encoding_errors='ignore')
+        df_loc = pd.read_csv(file_loc_path, encoding='cp949', encoding_errors='ignore')
+        df_code = pd.read_csv(file_code_path, encoding='cp949', encoding_errors='ignore')
+    except TypeError:
         try:
-            df_loc = pd.read_csv(file_loc_path, encoding='utf-8', errors='ignore')
-            df_code = pd.read_csv(file_code_path, encoding='utf-8', errors='ignore')
-        except FileNotFoundError as e:
-            st.error(f"⚠️ 원본 CSV 파일이 프로젝트 폴더에 없습니다: {e.filename}")
-            st.info("두 개의 원본 CSV 파일명이 정확한지, 파이썬 파일과 같은 폴더에 있는지 확인해주세요.")
-            st.stop()
-        except Exception as e:
-            st.error(f"데이터를 읽는 중 예측하지 못한 인코딩 오류가 발생했습니다: {e}")
-            st.stop()
+            # 2안: 구버전 판다스 규격 (errors='ignore')
+            df_loc = pd.read_csv(file_loc_path, encoding='cp949', errors='ignore')
+            df_code = pd.read_csv(file_code_path, encoding='cp949', errors='ignore')
+        except TypeError:
+            # 3안: 둘 다 지원 안 하는 특수 환경일 경우 기본 인코딩 강제 돌파
+            try:
+                df_loc = pd.read_csv(file_loc_path, encoding='cp949')
+                df_code = pd.read_csv(file_code_path, encoding='cp949')
+            except Exception:
+                df_loc = pd.read_csv(file_loc_path, encoding='utf-8')
+                df_code = pd.read_csv(file_code_path, encoding='utf-8')
+    except FileNotFoundError as e:
+        st.error(f"⚠️ 원본 CSV 파일이 프로젝트 폴더에 없습니다: {e.filename}")
+        st.info("두 개의 원본 CSV 파일명이 정확한지, 파이썬 파일과 같은 폴더에 있는지 확인해주세요.")
+        st.stop()
+    except Exception as e:
+        st.error(f"데이터를 읽는 중 예측하지 못한 오류가 발생했습니다: {e}")
+        st.stop()
 
+    # 원본 데이터 실시간 융합 및 주거지 분리 로직
     enriched_data = []
     for idx, row in df_loc.iterrows():
         lp = row['사업지역']
@@ -77,7 +89,7 @@ vibe_job = st.sidebar.slider("🏭 직주근접/미래가치 (산업단지, 개�
 # 4. Local Vibe Index 계산 알고리즘
 def calculate_vibe_index(df_data, w_youth, w_family, w_job):
     gus = df_data['구'].unique()
-    # 명시적 실수형 구조 정의로 미래 판다스 버전 경고 방지
+    # 명시적 실수형 구조 정의로 판다스 다운캐스팅 경고 완전 방어
     score_board = pd.DataFrame(0.0, index=gus, columns=['청년점수', '가족점수', '산업점수', '종합_Vibe_Index'])
 
     for idx, row in df_data.iterrows():
