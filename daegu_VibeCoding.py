@@ -1,3 +1,12 @@
+import streamlit as st  # 👈 이 줄이 반드시 맨 위에 완전히 살아있어야 합니다!
+import pandas as pd
+import os
+import re
+
+# 1. 페이지 설정
+st.set_page_config(page_title="대구 동네 정착 시뮬레이터", layout="wide", initial_sidebar_state="expanded")
+
+# 2. 데이터 로드 및 자동 융합 함수 (인코딩 에러 방어 적용)
 @st.cache_data
 def load_and_merge_data():
     current_dir = os.path.dirname(os.path.abspath(__file__))
