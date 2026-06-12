@@ -3,10 +3,10 @@ import pandas as pd
 import os
 import re
 
-# 1. 페이지 설정
+# 1. 페이지 설정 (최상단 고정)
 st.set_page_config(page_title="대구 동네 정착 시뮬레이터", layout="wide", initial_sidebar_state="expanded")
 
-# 2. 데이터 로드 및 자동 융합 함수
+# 2. 데이터 로드 및 자동 융합 함수 (인코딩 방어 적용)
 @st.cache_data
 def load_and_merge_data():
     current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -170,7 +170,6 @@ st.write("---")
 st.subheader("🔍 추천 지역 상세 들여다보기")
 selected_gu = st.selectbox("어느 지역구의 상세 동네 호재를 확인해볼까요?", result_index.index)
 
-# 컬럼명 유연성 확보
 gu_details = df[df['구'] == selected_gu][['동', '사업지역', '사업유형', '공급유형']].drop_duplicates()
 
 tab1, tab2 = st.tabs(["🏡 정착 추천 동네 (법정동)", "🏗️ 진행 중인 공공 개발 사업 목록"])
@@ -212,7 +211,8 @@ with tab1:
         if reason_tag:
             dong_reasons[dong].add(reason_tag)
 
-    sorted_dongs = sorted(dong_scores.items(), key=lambda x: x[1], ascending=False)
+    # 🛠️ [정정 완료] 기본 sorted 함수 규격에 맞게 reverse=True 옵션으로 변경했습니다.
+    sorted_dongs = sorted(dong_scores.items(), key=lambda x: x[1], reverse=True)
     
     for d_name, d_score in sorted_dongs:
         final_dong_view_score = min(100, int(d_score + 40)) 
