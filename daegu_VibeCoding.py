@@ -3,10 +3,10 @@ import pandas as pd
 import os
 import re
 
-# 1. 페이지 설정 (최상단 고정)
+# 1. 페이지 설정
 st.set_page_config(page_title="대구 동네 정착 시뮬레이터", layout="wide", initial_sidebar_state="expanded")
 
-# 2. 데이터 로드 및 자동 융합 함수 (인코딩 방어 적용)
+# 2. 데이터 로드 및 자동 융합 함수
 @st.cache_data
 def load_and_merge_data():
     current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -82,7 +82,7 @@ def calculate_vibe_index(df_data, w_youth, w_family, w_job):
     score_board = pd.DataFrame(0.0, index=gus, columns=['청년점수', '가족점수', '산업점수', '종합_Vibe_Index'])
     
     for idx, row in df_data.iterrows():
-        gu = row['gu'] if 'gu' in row else row['구']
+        gu = row['구']
         b_type = row['사업유형']
         p_name = row['사업지역']
         
@@ -114,7 +114,7 @@ def calculate_vibe_index(df_data, w_youth, w_family, w_job):
 
 result_index = calculate_vibe_index(df, vibe_youth, vibe_family, vibe_job)
 
-# [신규 추가] 4-2. 지도 시각화를 위한 대구 구군별 위경도 좌표 데이터 매핑 정의
+# 대구 구군별 위경도 좌표 데이터
 geo_data = {
     '중구': [35.8693, 128.6062],
     '동구': [35.8864, 128.6355],
@@ -123,11 +123,9 @@ geo_data = {
     '북구': [35.8920, 128.5830],
     '수성구': [35.8564, 128.6258],
     '달서구': [35.8294, 128.5323],
-    '달성군': [35.7746, 128.4312],
-    '군위군': [36.2423, 128.5728] # 군위군 데이터 대비 예방용 포함
+    '달성군': [35.7746, 128.4312]
 }
 
-# 지도 전용 데이터프레임 빌딩
 map_list = []
 for gu_name, score_row in result_index.iterrows():
     if gu_name in geo_data:
@@ -136,7 +134,6 @@ for gu_name, score_row in result_index.iterrows():
             '구': gu_name,
             'lat': geo_data[gu_name][0],
             'lon': geo_data[gu_name][1],
-            # 추천 지수가 높을수록 지도 위의 원 크기를 더 크게 동적으로 조절 (시각 효과)
             '원크기': float(vibe_score * 30 + 500)
         })
 df_map = pd.DataFrame(map_list)
@@ -163,27 +160,69 @@ with col1:
 with col2:
     st.subheader("🗺️ 대구 라이프스타일 추천 맵")
     st.write("내 성향에 적합한 구역일수록 지도 위에 **더 크고 선명한 원**으로 표시됩니다.")
-    
-    # Streamlit 내장 위경도 맵 스크린 구현
     if not df_map.empty:
         st.map(df_map, latitude='lat', longitude='lon', size='원크기', color='#FF4B4B')
     else:
-        st.warning("지도 표시에 필요한 매칭 데이터가 부족합니다.")
+        st.warning("지도 표시용 데이터가 부족합니다.")
 
 st.write("---")
 
 st.subheader("🔍 추천 지역 상세 들여다보기")
 selected_gu = st.selectbox("어느 지역구의 상세 동네 호재를 확인해볼까요?", result_index.index)
 
+# 컬럼명 유연성 확보
 gu_details = df[df['구'] == selected_gu][['동', '사업지역', '사업유형', '공급유형']].drop_duplicates()
 
 tab1, tab2 = st.tabs(["🏡 정착 추천 동네 (법정동)", "🏗️ 진행 중인 공공 개발 사업 목록"])
 
 with tab1:
-    st.write(f"**{selected_gu}** 내에서 대구도시개발공사의 주요 프로젝트가 집중되어 정착하기 좋은 핵심 동네입니다.")
-    unique_dongs = gu_details['동'].unique()
-    for d in unique_dongs:
-        st.markdown(f"- 📍 **{d}**")
+    st.write(f"**{selected_gu}** 내에서 대구도시개발공사의 주요 프로젝트 가치와 성향을 조합해 산출한 동네별 점수입니다.")
+    st.write("")
+    
+    dong_scores = {}
+    dong_reasons = {}
+    
+    for idx, row in gu_details.iterrows():
+        dong = row['동']
+        p_name = row['사업지역']
+        b_type = row['사업유형']
+        
+        current_score = 0
+        reason_tag = ""
+        
+        if b_type in ['행복주택임대', '다가구임대'] or '임대' in str(p_name):
+            current_score += (vibe_youth * 0.5)
+            reason_tag = "🎈 가성비 좋은 공공 주거 인프라 풍부"
+        if b_type == '아파트분양' or '청아람' in str(p_name) or '아파트' in str(p_name):
+            current_score += (vibe_family * 0.5)
+            reason_tag = "🏠 청아람 등 안정적인 공공분양/아파트 단지 조성"
+        if '산업단지' in str(p_name) or '의료지구' in str(p_name) or '과학산업' in str(p_name):
+            current_score += (vibe_job * 0.6)
+            reason_tag = "🏭 대형 신산업단지 배후 주거지 및 직주근접 수혜"
+        elif b_type == '택지분양':
+            current_score += (vibe_job * 0.3)
+            reason_tag = "🏗️ 택지개발을 통한 체계적인 신도시급 인프라 확장"
+
+        if dong not in dong_scores:
+            dong_scores[dong] = current_score
+            dong_reasons[dong] = set()
+        else:
+            dong_scores[dong] += current_score
+            
+        if reason_tag:
+            dong_reasons[dong].add(reason_tag)
+
+    sorted_dongs = sorted(dong_scores.items(), key=lambda x: x[1], ascending=False)
+    
+    for d_name, d_score in sorted_dongs:
+        final_dong_view_score = min(100, int(d_score + 40)) 
+        with st.expander(f"📍 {d_name} — ✨ 추천 점수: {final_dong_view_score}점"):
+            st.write("**💡 이 동네를 추천하는 이유:**")
+            if dong_reasons[d_name]:
+                for reason in dong_reasons[d_name]:
+                    st.markdown(f"- {reason}")
+            else:
+                st.markdown("- 🌲 대구도시개발공사의 균형 발전 계획에 포함된 쾌적한 관리 지역")
 
 with tab2:
     st.write(f"현재 **{selected_gu}**의 주거 환경을 바꾼 대구도시개발공사의 공식 사업 리스트입니다.")
