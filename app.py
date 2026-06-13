@@ -139,3 +139,52 @@ if df_code is not None and df_loc is not None and df_pop is not None and df_scho
             target_dong = sample_row['추출동']
 
             st.markdown(f"### 🚀 {selected_project} 정착을 위한 {target_gu} 정주 환경 평가")
+            st.info(f"🏢 본 사업지는 현재 **대구광역시 {target_gu} {target_dong}** 일대에 위치해 있습니다.")
+
+            # 학교정보 및 인구정보 레이아웃 분할 표출
+            col1, col2 = st.columns(2)
+
+            with col1:
+                st.subheader(f"🏫 {target_gu} 관내 학군 인프라 현황")
+                gu_schools = df_school[df_school['관할구군청'].str.contains(target_gu, na=False)]
+
+                if not gu_schools.empty:
+                    school_counts = gu_schools.groupby('학교유형').size().reset_index(name='학교 수')
+                    st.bar_chart(data=school_counts, x='학교유형', y='학교 수', color='#4F8BF9')
+                    st.dataframe(gu_schools[['학교명', '학교유형', '주소']].reset_index(drop=True), use_container_width=True,
+                                 height=200)
+                else:
+                    st.info("해당 구군의 학교 통계가 존재하지 않습니다.")
+
+            with col2:
+                st.subheader(f"👨‍👩‍👧‍👦 {target_gu} 동별 [{user_age}] 거주 인구 추이")
+                gu_pops = df_pop[df_pop['구군'] == target_gu].copy()
+                age_col = age_col_map[user_age]
+
+                if not gu_pops.empty:
+                    gu_pops[age_col] = gu_pops[age_col].astype(str).str.replace(',', '').astype(int)
+                    top_dongs = gu_pops.sort_values(by=age_col, ascending=False)[['동', age_col]].head(10)
+                    st.bar_chart(data=top_dongs, x='동', y=age_col, color='#FF4B4B')
+
+                    # 사업지 주변 동네 실제 거주 인구 매칭 지표
+                    is_pop_exist = df_pop[
+                        df_pop['동'].str.contains(target_dong[:2], na=False) & (df_pop['구군'] == target_gu)]
+                    if not is_pop_exist.empty:
+                        current_dong_pop = int(str(is_pop_exist.iloc[0][age_col]).replace(',', ''))
+                        st.metric(label=f"🎯 {target_dong}의 현재 {user_age} 실제 거주인구수", value=f"{current_dong_pop:,} 명")
+                    else:
+                        st.info("💡 본 개발 구역은 현재 인구 갱신 구역이거나 대규모 신규 입주 예정 부지입니다.")
+                else:
+                    st.info("해당 구군의 인구 통계가 존재하지 않습니다.")
+
+            # 종합 리포트 피드백
+            st.markdown("---")
+            st.subheader("📋 공공데이터 융합 최종 정착 리포트")
+            st.write(f"1. **기존 입지:** 본 사업지는 **대구 {target_gu} {target_dong}**에 속하며 유저님의 라이프스타일 기준에 부합하도록 추천 맵에 매핑되었습니다.")
+            st.write(
+                f"2. **교육/소셜 매칭 추가:** 해당 자치구 내에는 총 **{len(gu_schools)}개**의 학교가 있으며, 그래프를 통해 타겟 연령층({user_age})이 가장 역동적으로 밀집한 동네를 한눈에 대조 분석할 수 있습니다.")
+
+    else:
+        st.warning("⚠️ 필터 조건에 부합하는 도시개발사업이 없습니다.")
+else:
+    st.error("❌ 4개의 마스터 CSV 파일이 app.py와 같은 위치에 모두 보관되어 있는지 파일명을 확인해 주세요.")
