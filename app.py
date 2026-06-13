@@ -9,31 +9,36 @@ st.title("🏗️ 대구 대도시권 도시개발 X 라이프스타일 정착 �
 st.caption("대구도시개발공사 사업 정보와 연령별 인구, 학군 인프라 데이터를 융합한 맞춤형 입지 분석 플랫폼")
 st.markdown("---")
 
-# 📂 2. 4대 마스터 데이터 경로 설정
-DATA_DIR = "data"
-code_path = os.path.join(DATA_DIR, "대구도시개발공사_도시개발사업코드정보_20230821.csv")
-loc_path = os.path.join(DATA_DIR, "대구도시개발공사_사업소재지정보_20230821.csv")
-pop_path = os.path.join(DATA_DIR, "대구광역시_연령별인구현황(대구기본통계).csv")
-school_path = os.path.join(DATA_DIR, "대구광역시교육청 학교현황_20250401.csv")
+# 📂 2. 4대 마스터 데이터 경로 설정 (★ data 폴더 없이 app.py와 동일한 위치로 고정)
+code_path = "대구도시개발공사_도시개발사업코드정보_20230821.csv"
+loc_path = "대구도시개발공사_사업소재지정보_20230821.csv"
+pop_path = "대구광역시_연령별인구현황(대구기본통계).csv"
+school_path = "대구광역시교육청 학교현황_20250401.csv"
 
 
-# 🔄 3. 데이터 로드 및 전처리 (성능 최적화를 위한 캐싱 적용)
+# 🔄 3. 파일별 맞춤 인코딩 자동 탐색 함수 정의 (에러 원천 차단)
+def safe_read_csv(file_path):
+    for enc in ['utf-8', 'cp949', 'utf-8-sig']:
+        try:
+            return pd.read_csv(file_path, encoding=enc)
+        except UnicodeDecodeError:
+            continue
+    return pd.read_csv(file_path, encoding='latin1')
+
+
+# 성능 최적화를 위한 캐싱 적용
 @st.cache_data
 def load_all_data():
     try:
-        # A. 도시개발사업 기본 코드 정보
-        df_code = pd.read_csv(code_path, encoding='cp949')
+        # 파일이 같은 위치에 있는지 체크하고 안전하게 로드
+        df_code = safe_read_csv(code_path)
+        df_loc = safe_read_csv(loc_path)
 
-        # B. 사업소재지 정보
-        df_loc = pd.read_csv(loc_path, encoding='cp949')
-
-        # C. 연령별 인구현황 데이터 전처리
-        df_pop = pd.read_csv(pop_path, encoding='cp949')
+        df_pop = safe_read_csv(pop_path)
         df_pop['구군'] = df_pop['행정기관'].apply(lambda x: x.split()[1] if len(x.split()) > 1 else '')
         df_pop['동'] = df_pop['행정기관'].apply(lambda x: x.split()[2] if len(x.split()) > 2 else '')
 
-        # D. 학교현황 데이터 전처리 및 학교유형 분류
-        df_school = pd.read_csv(school_path, encoding='cp949')
+        df_school = safe_read_csv(school_path)
         df_school['학교유형'] = '기타'
         df_school.loc[df_school['학교명'].str.contains('초등학교'), '학교유형'] = '초등학교'
         df_school.loc[df_school['학교명'].str.contains('중학교'), '학교유형'] = '중학교'
@@ -65,7 +70,6 @@ if df_code is not None and df_loc is not None and df_pop is not None and df_scho
 
     # 🔄 5. 기존 바이브코딩 핵심 로직: 사업유형에 따른 소재지 데이터 필터링 연산
     if selected_type != "전체":
-        # 코드 정보에서 선택된 유형의 사업명 리스트 추출
         target_project_names = df_code[df_code['사업유형'] == selected_type]['사업명'].tolist()
         filtered_loc = df_loc[df_loc['사업지역'].isin(target_project_names)].copy()
     else:
@@ -82,7 +86,6 @@ if df_code is not None and df_loc is not None and df_pop is not None and df_scho
         selected_project = st.selectbox("👉 상세 분석 및 라이프스타일 시뮬레이션을 진행할 도시개발지구를 선택하세요", available_projects)
 
         if selected_project:
-            # 선택된 사업의 소재지 행 매칭
             project_dongs = filtered_loc[filtered_loc['사업지역'] == selected_project]
             sample_row = project_dongs.iloc[0]
             target_gu = sample_row['추출구군']
@@ -115,36 +118,29 @@ if df_code is not None and df_loc is not None and df_pop is not None and df_scho
             col1, col2 = st.columns(2)
 
             with col1:
-                st.sub_header(f"🏫 {target_gu} 지역 학군 인프라 (초/중/고 분포)")
-                # 해당 구군에 속한 학교 필터링
+                st.subheader(f"🏫 {target_gu} 지역 학군 인프라 (초/중/고 분포)")
                 gu_schools = df_school[df_school['관할구군청'].str.contains(target_gu, na=False)]
 
                 if not gu_schools.empty:
                     school_counts = gu_schools.groupby('학교유형').size().reset_index(name='학교 수')
-                    # 막대 차트 시각화
                     st.bar_chart(data=school_counts, x='학교유형', y='학교 수', color='#4F8BF9')
-                    # 데이터프레임 상세 리스트 표출
-                    st.dataframe(gu_schools[['학교명', '학교유형', '주소']].reset_index(drop=True), use_container_width=True,
-                                 height=250)
+                    st.dataframe(
+                        gu_schools[['學校名' if '學校名' in gu_schools.columns else '학교명', '학교유형', '주소']].reset_index(
+                            drop=True), use_container_width=True, height=250)
                 else:
                     st.info("해당 구군의 학교 현황 데이터가 존재하지 않습니다.")
 
             with col2:
-                st.sub_header(f"👨‍👩‍👧‍👦 {target_gu} 동별 [{user_age}] 이웃 인구 분포")
-                # 해당 구군의 인구 데이터 필터링
+                st.subheader(f"👨‍👩‍👧‍👦 {target_gu} 동별 [{user_age}] 이웃 인구 분포")
                 gu_pops = df_pop[df_pop['구군'] == target_gu].copy()
                 age_col = age_col_map[user_age]
 
                 if not gu_pops.empty:
-                    # 천 단위 콤마(,) 제거 후 정수형 변환 연산
                     gu_pops[age_col] = gu_pops[age_col].astype(str).str.replace(',', '').astype(int)
                     top_dongs = gu_pops.sort_values(by=age_col, ascending=False)[['동', age_col]].head(10)
 
-                    # 막대 차트 시각화
                     st.bar_chart(data=top_dongs, x='동', y=age_col, color='#FF4B4B')
 
-                    # 🎯 매치 메이킹 점수 힌트: 현재 개발 사업지와 유저 연령 이웃 연동성 지표
-                    # 행정동과 법정동 명칭 매칭 보정 (앞 두 글자 기준)
                     is_pop_exist = gu_pops[gu_pops['동'].str.contains(target_dong[:2], na=False)]
                     if not is_pop_exist.empty:
                         current_dong_pop = is_pop_exist.iloc[0][age_col]
@@ -167,4 +163,4 @@ if df_code is not None and df_loc is not None and df_pop is not None and df_scho
         st.warning("⚠️ 필터 조건에 부합하는 도시개발사업이 없습니다. 사이드바의 사업 유형을 조정해 주세요.")
 
 else:
-    st.error("❌ data/ 폴더 내에 4개의 마스터 CSV 파일이 모두 완벽하게 보관되어 있는지 파일명을 확인해 주세요.")
+    st.error("❌ 4개의 마스터 CSV 파일이 app.py와 같은 위치에 모두 보관되어 있는지 파일명을 확인해 주세요.")
